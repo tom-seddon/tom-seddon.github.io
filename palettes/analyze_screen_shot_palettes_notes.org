@@ -1,0 +1,32 @@
+#+STARTUP: overview
+
+* sizes
+
+#+begin_example
+    4558/4558
+    (640, 256): 3318
+    (640, 251): 198
+    (676, 274): 961
+    (640, 255): 58
+    (675, 264): 1 (Adventure)
+    (642, 257): 1 (Balloons)
+    (400, 160): 2 (CastleRaider; Cholo)
+    (644, 251): 1 (Confrontation)
+    (651, 262): 1 (Draughts)
+    (645, 259): 1 (Empire)
+    (644, 258): 1 (Fireman)
+    (646, 260): 1 (Fishing)
+    (657, 265): 1 (Invaders)
+    (671, 256): 2 (KnightOrc; KnightOrcpicturedisc)
+    (652, 256): 1 (NightmarePark)
+    (676, 275): 1 (OpalLily)
+    (639, 256): 2 (PitDash; Uridium)
+    (640, 258): 1 (RunSilent)
+    (647, 268): 1 (Shuttle)
+    (1280, 512): 1 (Skirmish)
+    (649, 281): 1 (WhiteLight)
+    (640, 215): 2 (WhiteMagic; WhiteMagic2)
+    (665, 260): 1 (Zark)
+#+end_example
+
+* eof.
