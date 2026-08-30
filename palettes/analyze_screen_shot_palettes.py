@@ -1,5 +1,4 @@
 #!/usr/bin/python3
-#(MacPorts python 3.14 is usefully quicker on my Mac...)
 import sys,os,os.path,argparse,zipfile,subprocess,tempfile,shutil,collections,concurrent.futures,contextlib,html,re,traceback,array,math,fnmatch
 import png
 
@@ -84,7 +83,7 @@ for i,name in enumerate(['black',
 # 2 bpp palette, value is its index; otherwise, value is None.
 FOUR_COLOUR_PALETTE_INDEX=[]
 
-# FOUR_COLOUR_PALETTE[INDEX] - INDEX is the index of a 2 bpp palette.
+# FOUR_COLOUR_PALETTES[INDEX] - INDEX is the index of a 2 bpp palette.
 # Value is a tuple (C0,C1,C2,C3), the 4 physical colours in the
 # palette.
 FOUR_COLOUR_PALETTES=[]
@@ -156,51 +155,51 @@ class HTMLWriter:
 ##########################################################################
 ##########################################################################
 
-Game=collections.namedtuple('Game','png_path id')
-GetGamePaletteResult=collections.namedtuple('GetGamePaletteResult','id palette')
+# Game=collections.namedtuple('Game','png_path id')
+# GetGamePaletteResult=collections.namedtuple('GetGamePaletteResult','id palette')
 
 ##########################################################################
 ##########################################################################
 
-def get_game_palette(game):
-    reader=png.Reader(filename=game.png_path)
-    result=reader.asRGBA8()
+# def get_game_palette(game):
+#     reader=png.Reader(filename=game.png_path)
+#     result=reader.asRGBA8()
 
-    palette=0
+#     palette=0
 
-    for row in result[2]:
-        assert len(row)==result[0]*4
+#     for row in result[2]:
+#         assert len(row)==result[0]*4
 
-        if isinstance(row,bytearray):
-            for x in range(0,len(row),4):
-                # palette|=1<<((row[x+0]>>7)|
-                #              (row[x+1]>>6&2)|
-                #              (row[x+2]>>5&4))
+#         if isinstance(row,bytearray):
+#             for x in range(0,len(row),4):
+#                 # palette|=1<<((row[x+0]>>7)|
+#                 #              (row[x+1]>>6&2)|
+#                 #              (row[x+2]>>5&4))
 
-                pixel=0
+#                 pixel=0
 
-                if row[x+0]>=128: pixel|=1
-                if row[x+1]>=128: pixel|=2
-                if row[x+2]>=128: pixel|=4
+#                 if row[x+0]>=128: pixel|=1
+#                 if row[x+1]>=128: pixel|=2
+#                 if row[x+2]>=128: pixel|=4
 
-                palette|=1<<pixel
-        elif isinstance(row,list):
-            for x in range(0,len(row),4):
-                r,g,b=row[x+0:x+3]
-                assert r>=0 and r<256
-                assert g>=0 and g<256
-                assert b>=0 and b<256
+#                 palette|=1<<pixel
+#         elif isinstance(row,list):
+#             for x in range(0,len(row),4):
+#                 r,g,b=row[x+0:x+3]
+#                 assert r>=0 and r<256
+#                 assert g>=0 and g<256
+#                 assert b>=0 and b<256
 
-                pixel=((0 if r<128 else 1)|
-                       (0 if g<128 else 2)|
-                       (0 if b<128 else 4))
+#                 pixel=((0 if r<128 else 1)|
+#                        (0 if g<128 else 2)|
+#                        (0 if b<128 else 4))
 
-                palette|=1<<pixel
+#                 palette|=1<<pixel
 
-        else: assert False,type(row)
+#         else: assert False,type(row)
 
-    return GetGamePaletteResult(id=game.id,
-                                palette=palette)
+#     return GetGamePaletteResult(id=game.id,
+#                                 palette=palette)
 
 ##########################################################################
 ##########################################################################
@@ -209,6 +208,8 @@ def write_palette_html(path,
                        title,
                        palette_indexes=None,
                        more_columns_fun=None):
+    if palette_indexes is not None and len(palette_indexes)==0: return
+    
     with open(path,'wt') as f:
         w=HTMLWriter(f)
 
@@ -223,7 +224,7 @@ def write_palette_html(path,
                             with w.el('font',{'color':'#ffffff'},cond=palette[j] in (0,4,5)):
                                 w.write(colour.name)
                     if more_columns_fun is not None:
-                        more_columns_fun(w,palette)
+                        more_columns_fun(w,index)
 
         with w.el('html'):
             with w.el('head'):
@@ -239,75 +240,75 @@ def write_palette_html(path,
 ##########################################################################
 ##########################################################################
 
-class Game:
-    def __init__(self,image_path,id_):
-        self.png_path=png_path
-        self.id=id_
-        self.palette=None
+# class Game:
+#     def __init__(self,image_path,id_):
+#         self.png_path=png_path
+#         self.id=id_
+#         self.palette=None
 
-def find_games(options):
-    game_id_re=re.compile(r'''.*-(?P<id>[0-9]+)\.[^.]+''')
+# def find_games(options):
+#     game_id_re=re.compile(r'''.*-(?P<id>[0-9]+)\.[^.]+''')
     
-    images_folder_path=os.path.join(options.output_path,'unzipped_images')
-    makedirs(images_folder_path)
+#     images_folder_path=os.path.join(options.output_path,'unzipped_images')
+#     makedirs(images_folder_path)
 
-    game_by_id={}
-    with zipfile.ZipFile(options.input_path,'r') as zf:
-        infolist=list(zf.infolist())
+#     game_by_id={}
+#     with zipfile.ZipFile(options.input_path,'r') as zf:
+#         infolist=list(zf.infolist())
 
-        for info in infolist:
-            if os.path.isabs(info.filename):
-                fatal('zip file contains absolute path: %s'%info.filename)
+#         for info in infolist:
+#             if os.path.isabs(info.filename):
+#                 fatal('zip file contains absolute path: %s'%info.filename)
                 
-        for info_index,info in enumerate(infolist):
-            print(f'''#{info_index} ({len(infolist)}): {info.filename}''')
-            # data=zf.read(info.filename)
+#         for info_index,info in enumerate(infolist):
+#             print(f'''#{info_index} ({len(infolist)}): {info.filename}''')
+#             # data=zf.read(info.filename)
 
-            image_path=os.path.join(images_folder_path,info.filename)
-            makedirs(os.path.dirname(image_path))
+#             image_path=os.path.join(images_folder_path,info.filename)
+#             makedirs(os.path.dirname(image_path))
 
-            ext=os.path.splitext(info.filename)[1].lower()
+#             ext=os.path.splitext(info.filename)[1].lower()
 
-            match=game_id_re.match(info.filename)
-            if match is None:
-                fatal('unexpected image name: %s'%name)
+#             match=game_id_re.match(info.filename)
+#             if match is None:
+#                 fatal('unexpected image name: %s'%name)
 
-            game_id=int(match.group('id'))
+#             game_id=int(match.group('id'))
 
-            if ext=='.png':
-                if not os.path.isfile(image_path):
-                    with open(image_path,'wb') as f:
-                        f.write(zf.read(info.filename))
+#             if ext=='.png':
+#                 if not os.path.isfile(image_path):
+#                     with open(image_path,'wb') as f:
+#                         f.write(zf.read(info.filename))
 
-                png_path=image_path
-            elif ext=='.gif':
-                # there's exactly 1 .gif, and "convert SRC DEST"
-                # doesn't handle it, possibly because it looks like
-                # it's an animated one.
-                #
-                # luckily, the game is mode 7 , so the screen grab is
-                # irrelevant.
-                continue
-            else:
-                png_path=image_path+'.png'
-                if not os.path.isfile(png_path):
-                    with tempfile.NamedTemporaryFile(mode='wb',
-                                                     delete=False,
-                                                     suffix=ext) as img_f:
-                        img_f.write(zf.read(info.filename))
-                        img_f.close()
+#                 png_path=image_path
+#             elif ext=='.gif':
+#                 # there's exactly 1 .gif, and "convert SRC DEST"
+#                 # doesn't handle it, possibly because it looks like
+#                 # it's an animated one.
+#                 #
+#                 # luckily, the game is mode 7 , so the screen grab is
+#                 # irrelevant.
+#                 continue
+#             else:
+#                 png_path=image_path+'.png'
+#                 if not os.path.isfile(png_path):
+#                     with tempfile.NamedTemporaryFile(mode='wb',
+#                                                      delete=False,
+#                                                      suffix=ext) as img_f:
+#                         img_f.write(zf.read(info.filename))
+#                         img_f.close()
 
-                        result=subprocess.run(['convert',
-                                               img_f.name,
-                                               png_path],
-                                              check=True)
+#                         result=subprocess.run(['convert',
+#                                                img_f.name,
+#                                                png_path],
+#                                               check=True)
                         
-                    os.unlink(img_f.name)
+#                     os.unlink(img_f.name)
 
-            assert game_id not in game_by_id
-            game_by_id[game_id]=Game(png_path,game_id)
+#             assert game_id not in game_by_id
+#             game_by_id[game_id]=Game(png_path,game_id)
 
-    return game_by_id
+#     return game_by_id
 
 ##########################################################################
 ##########################################################################
@@ -341,11 +342,13 @@ def unzip_images(input_path,work_path):
 
 # PaletteRegion=collections.namedtuple('PaletteRegion','palette ybegin yend')
 class PaletteRegion:
-    def __init__(self,palette,top,bottom):
+    def __init__(self,palette,rect):
         self.palette=palette
-        self.top=top
-        self.bottom=bottom
+        self.rect=rect
         self.image_path=None
+        self.interesting=None
+
+OverridePaletteRegion=collections.namedtuple('OverridePaletteRegion','palette top bottom')
 
 # TODO: naming...
 class Game2:
@@ -359,12 +362,16 @@ class Game2:
         self.image=None
         self.palette_regions=[]
 
+        # spot override haxx for some of the logic.
+        self.override_interesting=False
+        self.override_palette=None
+        self.override_rect=None
+        self.override_regions=None
+
 ##########################################################################
 ##########################################################################
 
-def get_games_dict(image_paths,name_patterns):
-    name_patterns=[name_pattern.lower() for name_pattern in name_patterns]
-    
+def get_games_dict(image_paths):
     games=[]
 
     game_id_re=re.compile(r'''(?P<name>.*)-(?P<gid>[0-9]+)''')
@@ -376,21 +383,11 @@ def get_games_dict(image_paths,name_patterns):
 
         name=m.group('name')
         
-        if len(name_patterns)==0: append=True
-        else:
-            append=False
-            for name_pattern in name_patterns:
-                if fnmatch.fnmatch(name.lower(),name_pattern):
-                    append=True
-                    break
+        game=Game2(name,
+                   int(m.group('gid')),
+                   image_path)
 
-        
-        if append:
-            game=Game2(name,
-                       int(m.group('gid')),
-                       image_path)
-
-            games.append(game)
+        games.append(game)
 
     game_by_gid={}
     for game in games:
@@ -893,34 +890,75 @@ def rect_ys(rect): return range(rect.top,rect.bottom)
 def rect_xs(rect): return range(rect.left,rect.right)
 def rect_w(rect): return rect.right-rect.left
 def rect_h(rect): return rect.bottom-rect.top
+def rect_union(a,b):
+    return Rect(left=min(a.left,b.left),
+                top=min(a.top,b.top),
+                right=max(a.right,b.right),
+                bottom=max(a.bottom,b.bottom))
 
-GetImagePaletteResult=collections.namedtuple('GetImagePaletteResult','gid actual_pixel_counts pixel_counts rect palette_regions')
+GetImagePaletteResult=collections.namedtuple('GetImagePaletteResult','gid pixel_counts rect palette_regions')
 
-def get_image_palette_job(gid,image,was_lossy):
-    # BBC border is always black. Strip it out.
-    rect=get_image_bbox(image)
+def get_image_palette_job(gid,
+                          image,
+                          was_lossy,
+                          override_rect,
+                          override_palette,
+                          override_regions):
+    if override_rect is not None:
+        # the override rect is specified in pre-shrunk coordinates.
+        rect=Rect(left=override_rect[0],
+                  top=override_rect[1]//2,
+                  right=override_rect[2],
+                  bottom=override_rect[3]//2)
+    else:
+        # BBC border is always black. Strip it out.
+        rect=get_image_bbox(image)
 
-    pixel_counts=[0]*8
+    row_pixel_counts=[]
+    for row in image: row_pixel_counts.append([0]*8)
+
     for y in rect_ys(rect):
         for x in rect_xs(rect):
-            pixel_counts[image[y][x]]+=1
+            row_pixel_counts[y][image[y][x]]+=1
 
-    actual_pixel_counts=pixel_counts[:]
+    # row_pixel_counts=[0]*rect_h(
+    # for y in rect_ys(rect):
+    #     for x in rect_xs(rect):
+    #         pixel_counts[image[y][x]]+=1
 
-    # lossy compression makes a bit of a mess, so make half an attempt
-    # to fix it up.
     if was_lossy:
-        threshold=(rect_w(rect)*rect_h(rect))//100
-        for i,n in enumerate(pixel_counts):
-            if n<threshold: pixel_counts[i]=0
+        # lossy compression makes a bit of a mess, so make half an
+        # attempt to fix it up.
+        #
+        # assume any pixel that is occurs only a handful of times in
+        # the row is an outlier.
+        threshold=rect_w(rect)/100
+        for y in range(len(image)):
+            for c in range(8):
+                if row_pixel_counts[y][c]>0:
+                    if row_pixel_counts[y][c]<threshold:
+                        row_pixel_counts[y][c]=0
+                        # ...and log?
+        
+        # for y in rect_ys(rect):
+        #     for x in rect_xs(rect):
+        # threshold=(rect_w(rect)*rect_h(rect))//100
+        # for i,n in enumerate(pixel_counts):
+        #     if n<threshold: pixel_counts[i]=0
+
+    pixel_counts=[0]*8
+    for y in range(len(image)):
+        for c in range(8):
+            pixel_counts[c]+=row_pixel_counts[y][c]
 
     # find colours used per row.
     row_palette=[None]*len(image)
     for y in rect_ys(rect):
         row_palette[y]=0
         for x in rect_xs(rect):
-            if pixel_counts[image[y][x]]>0:
-                row_palette[y]|=1<<image[y][x]
+            c=image[y][x]
+            assert c>=0 and c<8
+            if row_pixel_counts[y][c]>0: row_palette[y]|=1<<c
 
     # build up list of regions
     regions=[]
@@ -932,28 +970,46 @@ def get_image_palette_job(gid,image,was_lossy):
         assert top is not None
         assert bottom is not None
         assert palette is not None
-        regions.append(PaletteRegion(top=top,
-                                     bottom=bottom,
-                                     palette=palette))
-    
-    for y in rect_ys(rect):
-        if palette is not None:
-            assert top is not None
-            assert bottom is not None
+        regions.append(PaletteRegion(palette,
+                                     Rect(left=rect.left,
+                                          top=top,
+                                          right=rect.right,
+                                          bottom=bottom)))
 
-            if row_palette[y]==palette: bottom=y+1
-            else:
-                add_region()
-                top=None
-                bottom=None
-                palette=None
-        
-        if palette is None:
-            assert top is None
-            assert bottom is None
-            top=y
-            bottom=y+1
-            palette=row_palette[y]
+    if override_palette is not None:
+        # just one region in this case.
+        top=rect.top
+        bottom=rect.bottom
+        palette=override_palette
+    elif override_regions is not None:
+        next_top=0
+        for region in override_regions:
+            top=region.top or next_top
+            bottom=region.bottom or rect.bottom
+            palette=0
+            for i in region.palette: palette|=1<<i
+            add_region()
+            next_top=bottom
+            
+    else:
+        for y in rect_ys(rect):
+            if palette is not None:
+                assert top is not None
+                assert bottom is not None
+
+                if row_palette[y]==palette: bottom=y+1
+                else:
+                    add_region()
+                    top=None
+                    bottom=None
+                    palette=None
+
+            if palette is None:
+                assert top is None
+                assert bottom is None
+                top=y
+                bottom=y+1
+                palette=row_palette[y]
 
     add_region()
 
@@ -964,13 +1020,12 @@ def get_image_palette_job(gid,image,was_lossy):
         union=regions[i+0].palette|regions[i+1].palette
         if POPCOUNT[union]<=4:
             regions[i]=PaletteRegion(palette=union,
-                                     top=regions[i].top,
-                                     bottom=regions[i+1].bottom)
+                                     rect=rect_union(regions[i].rect,
+                                                     regions[i+1].rect))
             del regions[i+1]
         else: i+=1
 
     return GetImagePaletteResult(gid=gid,
-                                 actual_pixel_counts=actual_pixel_counts,
                                  pixel_counts=pixel_counts,
                                  rect=rect,
                                  palette_regions=regions)
@@ -982,7 +1037,10 @@ def get_palettes(game_by_gid,
         jobs.append((get_image_palette_job,
                      game.gid,
                      game.image,
-                     game.was_lossy_image))
+                     game.was_lossy_image,
+                     game.override_rect,
+                     game.override_palette,
+                     game.override_regions))
 
     results=run_process_pool_jobs('get stats',jobs)
 
@@ -1016,7 +1074,7 @@ def get_palettes(game_by_gid,
                 line+='palette=%d (0x%x) (%s)'%(r.palette,
                                                 r.palette,
                                                 PALETTE_STRINGS[r.palette])
-                line+=' y=%d-%d'%(r.top,r.bottom)
+                line+=' y=%d-%d'%(r.rect.top,r.rect.bottom)
                 any=True
             line+=']'
 
@@ -1029,7 +1087,7 @@ def get_palettes(game_by_gid,
         nregions=0
         for region in game.palette_regions:
             if FOUR_COLOUR_PALETTE_INDEX[region.palette] is None:
-                if region.bottom-region.top<=2:
+                if rect_h(region.rect)<=2:
                     # assume this is a slightly inefficient and/or
                     # ill-timed palette switch...
                     pass
@@ -1059,7 +1117,6 @@ def get_palette_region_image_path(output_path,
                         'images',
                         'lossy' if was_lossy_image else 'lossless',
                         '%s.%d.%d.png'%(name,gid,palette_region_index))
-        
 
 def save_game_images_job(output_path,
                          gid,
@@ -1067,13 +1124,10 @@ def save_game_images_job(output_path,
                          was_lossy_image,
                          full_image,
                          palette_regions):
-    palette=[colour.rgba for colour in BBC_COLOURS]
-    scale=0.25
-    for i in range(8):
-        palette.append((int(palette[i][0]*scale),
-                        int(palette[i][1]*scale),
-                        int(palette[i][2]*scale),
-                        255))
+    palette=2*[colour.rgb for colour in BBC_COLOURS]
+    
+    scale=0.2
+    for i in range(8): palette[i]=tuple([int(x*scale) for x in palette[i]])
 
     result=SaveGameImagesResult(gid=gid,
                                 paths=[])
@@ -1085,14 +1139,29 @@ def save_game_images_job(output_path,
                                            was_lossy_image,
                                            region_index)
         image=[]
-        for y,full_row in enumerate(full_image):
-            if y>=region.top and y<region.bottom: row=full_row
-            else:
-                row=bytearray()
-                for c in full_row:
-                    assert c>=0 and c<8
-                    row.append(8+c)
-            image.append(row)
+        for full_row in full_image: image.append(bytearray(full_row))
+
+        for y in rect_ys(region.rect):
+            for x in rect_xs(region.rect): image[y][x]+=8
+
+        image2=[]
+        for row in image:
+            image2.append(row)
+            image2.append(row)
+
+        image=image2
+        
+        # for y,full_row in enumerate(full_image):
+        #     row=bytearray(full_image[y])
+        #     for x,c in enumerate(full_row):
+                
+        #     if y>=region.rect.top and y<region.rect.bottom: row=full_row
+        #     else:
+        #         row=bytearray()
+        #         for c in full_row:
+        #             assert c>=0 and c<8
+        #             row.append(8+c)
+        #     image.append(row)
 
         save_indexed_png(path,image,palette)
 
@@ -1135,34 +1204,21 @@ def save_interesting_game_images_job(gid,
                                      output_path):
     assert len(palette_regions)>0
 
-    # is this game interesting at all?
-    #
-    # if there's any 4+-colour region longer than 2 scanlines, assume
-    # it's actually an 8-colour game and therefore not.
-    interesting=True
-    for region in palette_regions:
-        if FOUR_COLOUR_PALETTE_INDEX[region.palette] is None:
-            if region.bottom-region.top>2:
-                interesting=False
-                break
-
-    if interesting:
-        for region_index,region in enumerate(palette_regions):
-            if region.bottom-region.top>=32:
-                src_path=get_palette_region_image_path(work_path,
-                                                       gid,
-                                                       name,
-                                                       was_lossy_image,
-                                                       region_index)
-                split='split' if len(palette_regions)>1 else 'not_split'
-                dest_path=os.path.join(output_path,
-                                       'images',
-                                       split,
-                                       '%s.%d.%d.png'%(name,
-                                                       gid,
-                                                       region_index))
-                with open(src_path,'rb') as f: data=f.read()
-                with mkdir_and_open(dest_path,'wb') as f: f.write(data)
+    for region_index,region in enumerate(palette_regions):
+        if not region.interesting: continue
+        
+        src_path=get_palette_region_image_path(work_path,
+                                               gid,
+                                               name,
+                                               was_lossy_image,
+                                               region_index)
+        dest_path=os.path.join(output_path,
+                               'images',
+                               '%s.%d.%d.png'%(name,
+                                               gid,
+                                               region_index))
+        with open(src_path,'rb') as f: data=f.read()
+        with mkdir_and_open(dest_path,'wb') as f: f.write(data)
             
     return None
 
@@ -1237,22 +1293,25 @@ def rgb_stuff(rgb_str):
 
 ##########################################################################
 ##########################################################################
-    
-def save_full_table(game_by_gid,pred,name,output_path):
+
+def get_filtered_output_games_list(game_by_gid,pred,name):
     games=list(game_by_gid.values())
-
     if pred is not None: games=[game for game in games if pred(game)]
-
     print('%s: %d/%d'%(name,len(games),len(game_by_gid)))
-    
+
     games.sort(key=lambda game:game.name)
+
+    return games
+
+def save_full_table(game_by_gid,pred,name,output_path):
+    games=get_filtered_output_games_list(game_by_gid,pred,name)
 
     with open(os.path.join(output_path,'%s.html'%name),'wt') as f:
         w=HTMLWriter(f)
         with w.el('html'):
             with w.el('head'):
                 with w.el('title'):
-                    w.write(name)
+                    w.write('%s (full)'%name)
 
             with w.el('body'):
                 with w.el('table',{'border':1}):
@@ -1264,93 +1323,212 @@ def save_full_table(game_by_gid,pred,name,output_path):
                                 w.write('id=%d'%game.gid)
                                 w.vel('p')
                                 w.write('lossy=%s'%game.was_lossy_image)
-                            for region in game.palette_regions:
+
+                            for region_index,region in enumerate(game.palette_regions):
                                 with w.el('td'):
                                     w.vel('img',
                                           {'src':region.image_path,
                                            'width':160,
                                            'height':128})
-    
+                                    w.vel('br')
+                                    w.write('i=%d t=%d b=%d'%
+                                            (region_index,
+                                             region.rect.top,
+                                             region.rect.bottom))
+
 ##########################################################################
 ##########################################################################
 
-interesting_games=[
-    'Alphatron',
-    'Atomix',
-    'Aviatorhack',
-    'BarbarianTheUltimateWarrior',
-    'BarbarianIIDungeonOfDrax',
-    'Beebchase',
-    'BeverlyHillsCop',
-    'BigKO',
-    'Blockbusters',
-    'Boffin',                   # 0+5+6+7 (got squished?)
-    'BuffaloBillsRodeoGames',
-    'ByFairMeansOrFoul',        # needs rect hack
-    'CircusGames',
-    'CommonwealthGames86',
-    'CrazeeRider',
-    'EType',
-    'Elitedisc',
-    'EmlynHughesArcadeQuiz',
-    'FutureShock',
-    'GenesisProject',
-    'GeoffCapesStrongMan',
-    'Goal',
-    'HelterSkelter',            # 894=good
-    'HolyHorrors',
-    'Hostages',
-    'IndoorSports',
-    'JumpJet',                  # id=261
-    'JustifiedSadism',
-    'KarateCombat',
-    'KissinKousins',
-    'LastNinja',
-    'LastNinja2',
-    'LostCrystal',
-    'ManicMiner2021',
-    'Mikie',
-    'MoonbaseBeta',
-    'Mover',
-    'Nutcraka',
-    'Newmarket',
-    'Nevryon',
-    'OlympicDecathlon',
-    'OmegaOrb',
-    'Phantom',
-    'Pipeline',                 # 842
-    'Predator',
-    'ProBoxingSimulator',
-    'Psycastria2',              # 0+1+3+6 (all mucky jpegs)
-    'RaidOverMoscow',
-    'ReptonInfinity',           # 0+2+3+4 (jpegs)
-    'ReptonInfinityhack',       # 0+2+3+4 (jpegs)
-    'Revs',
-    'Revs4Tracks',
-    'Scramble',
-    'Sentineltape',
-    'Shark',
-    'SkirridTheShapesGame',
-    'SkoolDaze',
-    'SphereOfDestiny',
-    'SphereOfDestiny2',
-    'Spycat',
-    'SpyvsSpy',
-    'Starquake',
-    'StarClash',
-    'StuntCarRacer',
-    'SummerOlympiad',
-    'SuperiorSoccer',
-    'SupermanManOfSteel',
-    'Syncronhack',
-    'WayOfTheExplodingFist',
-    'WayOfTheExplodingFist',
-    'WinterOlympiad88',
-    'WinterOlympics',
-    'YieArKungFu',
-    'YieArKungFuII',
-    'Zen',
-]
+def save_palette_table(indexes,
+                       palette_uses,
+                       name,
+                       output_path):
+    print('%s: %s'%(name,indexes))
+    def write_columns(w,palette_index):
+        u=palette_uses[palette_index]
+        assert u.index==palette_index
+
+        with w.el('td'):
+            w.write('%d total; %d unsplit; %d split'%(u.num_total,
+                                                      u.num_unsplit,
+                                                      u.num_split))
+        
+    write_palette_html(os.path.join(output_path,'%s.html'%name),
+                       name,
+                       indexes,
+                       write_columns)
+
+##########################################################################
+##########################################################################
+
+RegionImage=collections.namedtuple('RegionImage','game region_index')
+
+def save_palette_and_games_table(indexes,
+                                 game_by_gid,
+                                 pred,
+                                 name,
+                                 output_path,debug):
+    games=get_filtered_output_games_list(game_by_gid,pred,name)
+
+    region_images_by_palette_index={}
+    for game in games:
+        for region_index,region in enumerate(game.palette_regions):
+            if not region.interesting: continue
+            
+            index=FOUR_COLOUR_PALETTE_INDEX[region.palette]
+            if index is not None:
+                palette=FOUR_COLOUR_PALETTES[index]
+                region_images_by_palette_index.setdefault(index,[]).append(RegionImage(game=game,region_index=region_index))
+
+    images_per_row=7
+
+    def write_columns(w,palette_index):
+        images=region_images_by_palette_index[palette_index]
+
+        with w.el('td'):
+            with w.el('table'):
+                num_rows=(len(images)+images_per_row-1)//images_per_row
+                for y in range(num_rows):
+                    with w.el('tr'):
+                        for x in range(images_per_row):
+                            i=y*images_per_row+x
+                            if i>=len(images): break
+
+                            url='https://bbcmicro.co.uk/game.php?id=%d'%images[i].game.gid
+                            region=images[i].game.palette_regions[images[i].region_index]
+                            img_path=os.path.join('images',
+                                                  os.path.basename(region.image_path))
+                            
+                            with w.el('td'):
+                                with w.el('a',{'href':url}):
+                                    w.vel('img',{'src':img_path,
+                                                 'width':160,
+                                                 'height':128})
+
+                                if debug:
+                                    w.vel('br')
+                                    w.write('i=%d t=%d b=%d p=%d'%
+                                            (images[i].region_index,
+                                             region.rect.top,
+                                             region.rect.bottom,
+                                             region.palette))
+
+    write_palette_html(os.path.join(output_path,'%s.html'%name),
+                       name,
+                       indexes,
+                       write_columns)
+
+##########################################################################
+##########################################################################
+
+class PaletteUses:
+    def __init__(self,index):
+        self.index=index
+        self.num_split=0
+        self.num_unsplit=0
+
+    @property
+    def num_total(self): return self.num_split+self.num_unsplit
+
+def save_output_files(game_by_gid,
+                      output_path,
+                      debug):
+
+    palette_uses_by_index=[]
+    for i in range(len(FOUR_COLOUR_PALETTES)):
+        palette_uses_by_index.append(PaletteUses(i))
+
+    for game in game_by_gid.values():
+        for region in game.palette_regions:
+            if not region.interesting: continue
+            
+            index=FOUR_COLOUR_PALETTE_INDEX[region.palette]
+            if index is not None:
+                u=palette_uses_by_index[index]
+                assert u.index==index
+                if len(game.palette_regions)>1: u.num_split+=1
+                elif len(game.palette_regions)==1: u.num_unsplit+=1
+                else: assert False,(game.name,game.gid)
+
+    # for u in palette_uses_by_index:
+    #     print('index=%d: total=%d split=%d unsplit=%d'%(u.index,
+    #                                                     u.num_total,
+    #                                                     u.num_split,
+    #                                                     u.num_unsplit))
+
+    for sort_by_count in [False,True]:
+        for split in [None,False,True]:
+            if split is None:
+                get_count=lambda u: u.num_total
+                is_game_relevant=None
+            elif split:
+                get_count=lambda u: u.num_split
+                is_game_relevant=lambda g: len(g.palette_regions)>1
+            else:
+                get_count=lambda u: u.num_unsplit
+                is_game_relevant=lambda g: len(g.palette_regions)==1
+
+            palette_uses=palette_uses_by_index[:]
+            palette_uses.sort(key=lambda u: u.index)
+            if sort_by_count:
+                palette_uses.sort(key=get_count,reverse=True)
+
+            suffix=''
+            
+            if split is None: suffix+='.all'
+            elif split: suffix+='.split'
+            else: suffix+='.unsplit'
+            
+            if sort_by_count: suffix+='.by_count'
+            else: suffix+='.by_index'
+
+            used_palette_indexes=[]
+            for u in palette_uses:
+                if get_count(u)>0:
+                    used_palette_indexes.append(u.index)
+            
+            save_palette_table(used_palette_indexes,
+                               palette_uses_by_index,
+                               'palette_uses'+suffix,
+                               output_path)
+
+            # no point saving 2 copies of this...!
+            if not sort_by_count:
+                unused_palette_indexes=[]
+                for u in palette_uses:
+                    if get_count(u)==0:
+                        unused_palette_indexes.append(u.index)
+
+                save_palette_table(unused_palette_indexes,
+                                   palette_uses_by_index,
+                                   'unused_palettes'+suffix,
+                                   output_path)
+
+            save_palette_and_games_table(used_palette_indexes,
+                                         game_by_gid,
+                                         is_game_relevant,
+                                         'games'+suffix,
+                                         output_path,
+                                         debug)
+
+##########################################################################
+##########################################################################
+
+def filter_games(game_by_gid,name_patterns):
+    if len(name_patterns)==0: return
+
+    name_patterns=[name_pattern.lower() for name_pattern in name_patterns]
+
+    for gid in game_by_gid.keys():
+        game=game_by_gid[gid]
+
+        keep=False
+        for name_pattern in name_patterns:
+            if fnmatch.fnmatch(game.name.lower(),name_pattern):
+                keep=True
+                break
+
+        if not keep: del game_by_gid[gid]
 
 def main2(options):
     global g_verbose
@@ -1359,15 +1537,28 @@ def main2(options):
     if options.rgb is not None: return rgb_stuff(options.rgb)
 
     # create work folder.
+    telltale_name='7F6E78AF-B15A-4B4E-B64B-3DE0128CF712'
     create_script_folder(options.output_path,
                          options.clean,
                          'output path',
-                         '7F6E78AF-B15A-4B4E-B64B-3DE0128CF712')
+                         telltale_name)
 
-    work_path=os.path.join(options.output_path,'work')
+    work_folder_name='work'
+    
+    with open(os.path.join(options.output_path,
+                           '.gitignore'),'wt') as f:
+        f.write('/%s/\n'%work_folder_name)
+
+        # leave the telltale file in place, so the output folder can
+        # be updated from another system. The work folder will be
+        # regenerated as required.
+
+        # f.write('/%s\n'%telltale_name)
+
+    work_path=os.path.join(options.output_path,work_folder_name)
     makedirs(work_path)
     
-    output_path=os.path.join(options.output_path,'output')
+    output_path=os.path.join(options.output_path,'htdocs')
     makedirs(output_path)
 
     if options.clean_images: rmtree(os.path.join(output_path,'images'))
@@ -1377,11 +1568,167 @@ def main2(options):
                        'All BBC Micro Mode 1/5 Palettes')
 
     # unzip all images into work folder, as-is from the zip file.
+    print('unzip images')
     image_paths=unzip_images(options.input_path,work_path)
 
     # get games list
-    game_by_gid=get_games_dict(image_paths,options.
-                               game_name_patterns)
+    game_by_gid=get_games_dict(image_paths)
+
+    # explicitly mark interesting multi-region games.
+    #
+    # this proved a complete pain to try to do automatically.
+    # Scrolling through a list and picking them out manually? Took
+    # about 15 minutes. 
+    #
+    # (see also: save_interesting_game_images_job)
+
+    def interesting(name,gid=None,palette=None,rect=None,regions=None):
+        num_found=0
+        for game in game_by_gid.values():
+            if (game.name.lower()==name.lower() and
+                (gid is None or game.gid==gid)):
+                num_found+=1
+                
+                game.override_interesting=True
+
+                if palette is not None:
+                    assert regions is None
+                    assert len(palette)==4,(name,gid,palette)
+                    assert len(set(palette))==4,(name,gid,palette)
+                    assert game.override_palette is None,(name,gid,game.override_palette)
+
+                    game.override_palette=0
+                    for i in range(4):
+                        assert palette[i]>=0 and palette[i]<8,(name,gid,i,palette)
+                        game.override_palette|=1<<palette[i]
+
+                if regions is not None:
+                    assert palette is None
+
+                    for region in regions:
+                        assert isinstance(region,OverridePaletteRegion)
+
+                    game.override_regions=regions
+
+                if rect is not None:
+                    assert ((isinstance(rect,tuple) and len(rect)==4) or
+                            isinstance(rect,Rect)),(name,gid,rect)
+                    assert game.override_rect is None,(name,gid,game.override_rect)
+
+                    game.override_rect=Rect(left=rect[0],
+                                            top=rect[1],
+                                            right=rect[2],
+                                            bottom=rect[3])
+
+        if gid is not None: assert num_found==1
+        else: assert num_found>=1
+    
+    interesting('Alphatron')
+    # interesting('Atomix') # mode 2
+    interesting('Aviatorhack')
+    interesting('BarbarianTheUltimateWarrior')
+    interesting('BarbarianIIDungeonOfDrax')
+    interesting('Beebchase')
+    interesting('BeverlyHillsCop')
+    interesting('BigKO')
+    interesting('Blockbusters')
+    interesting('Boffin',palette=(0,5,6,7))      # 0+5+6+7 (got squished?)
+    interesting('BuffaloBillsRodeoGames')
+    interesting('ByFairMeansOrFoul',gid=741,rect=Rect(0,0,576,384))
+    interesting('CircusGames')
+    interesting('CommonwealthGames86')
+    interesting('CrazeeRider')
+    interesting('EType')
+    interesting('Elitedisc')
+    interesting('EmlynHughesArcadeQuiz')
+    interesting('FutureShock')
+    interesting('GenesisProject')
+    interesting('GeoffCapesStrongMan')
+    interesting('Goal')
+    interesting('HelterSkelter',gid=894) # 894=good
+    interesting('HolyHorrors')
+    interesting('Hostages')
+    interesting('IndoorSports')
+    interesting('JumpJet',gid=261) # id=261
+    interesting('JustifiedSadism')
+    interesting('KarateCombat')
+    interesting('KissinKousins')
+    interesting('LastNinja')
+    interesting('LastNinja2')
+    interesting('LostCrystal')
+    interesting('ManicMiner2021')
+    interesting('Mikie')
+    interesting('MoonbaseBeta')
+    # interesting('Mover')
+    interesting('Nutcraka')
+    # interesting('Newmarket')
+    interesting('Nevryon')
+    interesting('OlympicDecathlon')
+    interesting('OmegaOrb')
+    interesting('Phantom')
+    interesting('Pipeline',gid=842,palette=(0,1,3,4)) # 842
+    interesting('Predator',
+                regions=(OverridePaletteRegion(palette=(0,4,5,6),
+                                               top=None,
+                                               bottom=76),
+                         OverridePaletteRegion(palette=(0,1,2,3),
+                                               top=None,
+                                               bottom=None)))
+    # interesting('ProBoxingSimulator') # annoying mucky jpeg...!
+    interesting('Psycastria',palette=(0,2,4,7))
+    interesting('Psycastria2',palette=(0,1,3,6)) # 0+1+3+6 (jpegs)
+    interesting('RaidOverMoscow')     # 
+    interesting('ReptonInfinity',palette=(0,2,3,4))     # 0+2+3+4 (jpegs)
+    interesting('ReptonInfinityhack',palette=(0,2,3,4)) # 0+2+3+4 (jpegs)
+    interesting('Revs')
+    interesting('Revs4Tracks')
+    # interesting('Scramble')
+    interesting('Sentineltape',palette=(0,2,4,7))
+    # interesting('Shark') # it's mode 2!
+    interesting('SkirridTheShapesGame')
+    interesting('SkoolDaze')
+    interesting('SphereOfDestiny')
+    interesting('SphereOfDestiny2')
+    interesting('Spycat')
+    interesting('SpyvsSpy')
+    interesting('Starquake')
+    interesting('StarClash')
+    interesting('StuntCarRacer',
+                regions=(OverridePaletteRegion(palette=(0,1,3,4),
+                                               top=None,
+                                               bottom=40),
+                         OverridePaletteRegion(palette=(0,1,3,6),
+                                               top=None,
+                                               bottom=189),
+                         OverridePaletteRegion(palette=(0,1,3,4),
+                                               top=None,
+                                               bottom=None)))
+                
+    interesting('SummerOlympiad')
+    interesting('SuperiorSoccer')
+    interesting('SupermanManOfSteel')
+    # interesting('Syncronhack') # jpeg
+    interesting('WayOfTheExplodingFist',gid=341)
+    interesting('WayOfTheExplodingFist',
+                gid=2424,
+                regions=(OverridePaletteRegion(palette=(0,6,1,7),
+                                               top=None,
+                                               bottom=70),
+                         OverridePaletteRegion(palette=(0,1,7,3),
+                                               top=None,
+                                               bottom=124),
+                         OverridePaletteRegion(palette=(0,4,3,6),
+                                               top=None,
+                                               bottom=None)))
+    interesting('WayOfTheExplodingFist')
+    interesting('WinterOlympiad88')
+    interesting('WinterOlympics')
+    interesting('YieArKungFu')
+    interesting('YieArKungFuII')
+    interesting('Zen')
+
+    # filter games list.
+    filter_games(game_by_gid,options.game_name_patterns)
     if len(game_by_gid)==0: fatal('no games found')
 
     # ensure every game has a .png.
@@ -1399,141 +1746,43 @@ def main2(options):
     save_images(game_by_gid,
                 work_path),
 
-    # find the interesting palette regions. "interesting" is not
-    # precisely defined, but: if there's more than 32 scanlines (8
-    # character rows), that's probably good enough.
+    # find the interesting palette regions.
+    for game in game_by_gid.values():
+        interesting=False
+        if len(game.palette_regions)==1: interesting=True
+        elif game.override_interesting: interesting=True
+
+        if interesting:
+            for region in game.palette_regions:
+                # it should only take 2 scanlines to switch the entire
+                # palette? But it looks like 4 would be a better
+                # threshold for excluding uninteresting images.
+                if rect_h(region.rect)>=4:
+                    region.interesting=True
+        
     save_interesting_images(game_by_gid,work_path,output_path)
 
     #
-    save_full_table(game_by_gid,None,'all',work_path)
-    save_full_table(game_by_gid,
-                    lambda g: len(g.palette_regions)>1,
-                    'split',
-                    work_path)
-    save_full_table(game_by_gid,
-                    lambda g: g.was_lossy_image,
-                    'lossy',
-                    work_path)
-    save_full_table(game_by_gid,
-                    lambda g: (g.was_lossy_image and
-                               len(g.palette_regions)>1),
-                    'split_lossy',
-                    work_path)
+    # save_full_table(game_by_gid,None,'all',work_path)
+    # save_full_table(game_by_gid,
+    #                 lambda g: len(g.palette_regions)>1,
+    #                 'split',
+    #                 work_path)
+    # save_full_table(game_by_gid,
+    #                 lambda g: g.was_lossy_image,
+    #                 'lossy',
+    #                 work_path)
+    # save_full_table(game_by_gid,
+    #                 lambda g: (g.was_lossy_image and
+    #                            len(g.palette_regions)>1),
+    #                 'split_lossy',
+    #                 work_path)
 
-    # games_by_image_size={}
-    # for game in game_by_gid.values():
-    #     games_by_image_size.setdefault(game.image_size,[]).append(game)
+    #
+    save_output_files(game_by_gid,
+                      output_path,
+                      options.debug)
 
-    # for image_size,games in games_by_image_size.items():
-    #     print('%s: %d'%(image_size,len(gam
-
-    return
-
-    with concurrent.futures.ProcessPoolExecutor(max_workers=os.cpu_count()) as executor:
-        all_good=True
-        futures=[executor.submit(get_game_palette,game) for game in game_by_id.values()]
-
-        num_completed=0
-        for future in concurrent.futures.as_completed(futures):
-            num_completed+=1
-
-            prefix='%d/%d'%(num_completed,len(futures))
-            try:
-                result=future.result()
-                print('%s: succeeded'%prefix)
-            except Exception as e:
-                all_good=False
-                result=None
-                print('%s: failed: %s'%(prefix,e))
-
-            if result is not None:
-                assert result.id in game_by_id
-                assert game_by_id[result.id].palette is None
-                game_by_id[result.id].palette=result.palette
-
-    if not all_good: fatal('failed')
-
-    games_by_palette={}
-    for game in game_by_id.values():
-        index=FOUR_COLOUR_PALETTE_INDEX[game.palette]
-        if index is not None:
-            palette=FOUR_COLOUR_PALETTES[index]
-            games_by_palette.setdefault(palette,[]).append(game)
-
-    images_folder_name='images'
-    makedirs(os.path.join(options.output_path,images_folder_name))
-
-    def add_example_images(w,palette):
-        assert w is not None
-        assert palette is not None
-
-        games=games_by_palette.get(palette)
-
-        if games is not None:
-            games_per_row=8
-            with w.el('td'):
-                with w.el('table'):
-                    for y in range((len(games)+games_per_row-1)//games_per_row):
-                        with w.el('tr'):
-                            for x in range(games_per_row):
-                                i=y*games_per_row+x
-                                if i>=len(games): break
-
-                                # don't link to unzipped_images. copy
-                                # the thing to another path so it's
-                                # all self-contained.
-                                img_path='%s/%s'%(images_folder_name,
-                                                  os.path.basename(games[i].png_path))
-                                shutil.copyfile(
-                                    games[i].png_path,
-                                    os.path.join(options.output_path,
-                                                 img_path))
-
-                                with w.el('td'):
-                                    url='https://bbcmicro.co.uk/game.php?id=%d'%games[i].id
-                                    with w.el('a',{'href':url}):
-                                        w.vel('img',{'src':img_path,
-                                                     'width':160,
-                                                     'height':128})
-        
-        # if games is not None:
-        #     for i in range(len(games)):
-        #         path=os.path.relpath(games[i].png_path,
-        #                              options.output_path)
-        #         with w.el('td'):
-        #             url='https://bbcmicro.co.uk/game.php?id=%d'%games[i].id
-        #             with w.el('a',{'href':url}):
-        #                 w.vel('img',{'src':path,
-        #                              'width':160,
-        #                              'height':128})
-
-    palette_indexes=[i for i in range(len(FOUR_COLOUR_PALETTES)) if FOUR_COLOUR_PALETTES[i] in games_by_palette]
-                        
-    write_palette_html(os.path.join(options.output_path,'images.html'),
-                       'Used BBC Micro Mode 1/5 Palettes',
-                       palette_indexes,
-                       more_columns_fun=add_example_images)
-
-    palette_indexes.sort(key=lambda x: len(games_by_palette[FOUR_COLOUR_PALETTES[x]]))
-
-    write_palette_html(os.path.join(options.output_path,'images_sorted.html'),
-                       'Used BBC Micro Mode 1/5 Palettes',
-                       palette_indexes,
-                       more_columns_fun=add_example_images)
-
-    write_palette_html(os.path.join(options.output_path,
-                                    'unused_palettes.html'),
-                       'Unused BBC Micro Mode 1/5 Palettes',
-                       palette_indexes=[i for i in range(len(FOUR_COLOUR_PALETTES)) if FOUR_COLOUR_PALETTES[i] not in games_by_palette])
-
-    # palettes_seen=set()
-    # for result in results:
-    #     if FOUR_COLOUR_PALETTE[result.palette] is not None:
-    #         palettes_seen.add(result.palette)
-
-    # print(len(palettes_seen))
-
-    
 ##########################################################################
 ##########################################################################
 
@@ -1549,6 +1798,7 @@ def main(argv):
     parser.add_argument('--palette-regions',action='store_true',help='''print palette regions''')
     parser.add_argument('-g','--game',action='append',dest='game_name_patterns',default=[],metavar='PATTERN',help='''include only game(s) matching %(metavar)s, a case-insensitive glob pattern''')
     parser.add_argument('--rgb',metavar='RGB',help='''print info about %(metavar)s, hex RGB colour''')
+    parser.add_argument('--debug',action='store_true')
 
     main2(parser.parse_args(argv))
 
